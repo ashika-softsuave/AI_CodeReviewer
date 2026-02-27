@@ -1,183 +1,236 @@
-# Agentic Code Fix System
+# AI Code Reviewer with Supervised Fix–Retry Agentic Loop
 
-An agentic AI workflow that iteratively reviews, modifies, validates, and evaluates source code using LLM-based reasoning.
+## 🚀 Overview
 
-## Architecture
+This project implements a multi-agent AI system that autonomously reviews, fixes, validates, evaluates, and iteratively improves source code until it meets a predefined quality threshold.
 
-The system follows a multi-stage agent loop:
+Unlike traditional one-shot AI code reviewers, this system uses a supervised agentic loop with dynamic orchestration, convergence detection, rewrite safety, and cost tracking.
 
-Review → Fix Generation → Language Detection → Validation → Evaluation → Decision
+---
 
-Each stage is isolated into a dedicated agent to improve reliability and control.
+## 🧠 Core Concept
 
-## Project Structure
+The system follows this intelligent workflow:
 
-agents/
-    review_agent.py
-    fix_agent.py
-    validation_agent.py
-    evaluation_agent.py
-    decision_agent.py
+1. Review the code
+2. Generate fixes
+3. Validate syntax
+4. Evaluate quality
+5. Detect stagnation (plateau)
+6. Retry or accept based on Supervisor decision
 
-services/
-    agentic_service.py
+A Supervisor Agent dynamically controls which agents run during each iteration.
 
-utils/
-    llm_client.py
-    file_utils.py
+---
 
-config/
-    ai_config.py
+## 🏗️ Architecture
 
-routes/
-    agentic_routes.py
+API Layer (FastAPI)  
+        ↓  
+Service Layer (Orchestrator)  
+        ↓  
+Supervisor Agent (Planner)  
+        ↓  
+Worker Agents:  
+- Review Agent  
+- Fix Agent  
+- Validation Agent  
+- Evaluation Agent  
+- Diff Agent  
+        ↓  
+OpenAI Model  
 
-## Requirements
+---
 
-- Python 3.9+
-- OpenAI API Key
-- FastAPI
+## ⚙️ Key Features
 
-Install dependencies:
+- Iterative Fix → Evaluate → Retry loop
+- Dynamic agent selection via Supervisor
+- Syntax validation gating
+- Rewrite safety using diff analysis
+- Plateau detection (convergence control)
+- Maximum retry protection
+- Token usage tracking (cost awareness)
+- Persistent iteration memory
+- REST API interface using FastAPI
 
-pip install -r requirements.txt
+---
 
-## Environment Setup
+## 📂 Project Structure
 
-Create a `.env` file:
+AI_CodeReviewer/
 
-OPENAI_API_KEY=your_api_key_here
+- main.py  
+- routes/route.py  
+- services/agentic_service.py  
+- agents/  
+  - review_agent.py  
+  - fix_agent.py  
+  - evaluation_agent.py  
+  - validation_agent.py  
+  - decision_agent.py  
+  - supervisor_agent.py  
+  - diff_agent.py  
+  - memory_agent.py  
+- utils/  
+  - llm_client.py  
+  - file_utils.py  
+- config/ai_config.py  
+- agent_memory.json  
+- requirements.txt  
+- .env  
 
-## Running the Server
+---
 
-uvicorn main:app --reload
+## 🔁 Workflow Explanation
 
-## API Endpoint
+### Step 1 – User Request
 
-POST /agentic-fix-file
-
-Request Body:
+User sends instruction:
 
 {
-    "instruction": "Convert this code to Python"
+  "instruction": "Fix bugs in the file"
 }
 
-## Agent Workflow
+---
 
-1. Review Agent analyzes defects or mismatches
-2. Fix Agent generates modified code
-3. Language Detection identifies output language
-4. Validation Agent checks syntax validity
-5. Evaluation Agent scores solution quality
-6. Decision Agent accepts or retries
+### Step 2 – Orchestration Begins
 
-## Retry Logic
+- Target file is loaded
+- System state initialized
+- Supervisor created
+- Iterative loop begins
 
-The system retries up to MAX_RETRIES defined in config.
+---
 
-## Limitations
+### Step 3 – Supervisor Planning
 
-- Validation is LLM-based (probabilistic)
-- Deterministic guarantees require compiler/runtime execution
-- Language detection accuracy depends on model output quality
+Supervisor evaluates:
 
-## Configuration
+- Current retry count
+- Quality score
+- Validation failure status
+- Rewrite percentage
+- Plateau condition
 
-Edit config/ai_config.py:
+It decides:
 
-MODEL_NAME
-MAX_RETRIES
-TARGET_FILE
-ACCEPTANCE_THRESHOLD
+- Stop
+- Accept
+- Continue
+- Which agents to execute
 
-## Security Notes
+---
 
-- Never commit `.env`
-- API keys must remain local
-- Avoid logging sensitive prompts/responses in production
+### Step 4 – Dynamic Agent Execution
 
-## Running the Program
+Depending on the plan, selected agents run:
 
-1. Prerequisites
+- Review → Identify issues  
+- Fix → Generate improved code  
+- Validate → Check syntax correctness  
+- Evaluate → Score quality improvement  
+- Diff → Measure rewrite percentage  
 
-Ensure the following are installed:
+---
 
-Python 3.9 or newer
+### Step 5 – Convergence Control
 
-pip
+Loop stops when:
 
-Internet access (required for model calls)
+- Score ≥ acceptance threshold  
+- Plateau detected  
+- Maximum retries reached  
 
-Check Python version:
+System guarantees termination.
 
-python --version
+---
 
-2. Clone Repository
-git clone <repository_url>
-cd <project_folder>
+## 🤖 Model Usage
 
-3. Create Virtual Environment (Recommended)
+Configured in `config/ai_config.py`.
 
-Windows
-python -m venv venv
-venv\Scripts\activate
-Linux / macOS
+Used for:
 
-python -m venv venv
-source venv/bin/activate
+- Code review reasoning
+- Fix generation
+- Syntax validation
+- Quality evaluation
+- Language detection
 
-4. Install Dependencies
-pip install -r requirements.txt
+Temperature is set to 0 for deterministic behavior.
 
-If no requirements.txt exists:
-pip install fastapi uvicorn python-dotenv openai
+---
 
-5. Configure Environment Variables
+## 📊 Safety & Control Mechanisms
 
-Create a .env file in the project root:
-OPENAI_API_KEY=your_api_key_here
+| Mechanism | Purpose |
+|------------|----------|
+| Validation Gating | Prevents evaluation of broken code |
+| Diff Analysis | Prevents full file rewrites |
+| Plateau Detection | Stops useless retries |
+| Max Retry Limit | Guarantees loop termination |
+| Token Tracking | Monitors API usage cost |
 
-Do not commit this file.
+---
 
-6. Verify Configuration
+## 🔧 Installation
 
-Edit:
-config/ai_config.py
-Example:
+### 1. Clone Repository
 
-MODEL_NAME = "gpt-4o-mini"
-MAX_RETRIES = 3
-TARGET_FILE = "nijal.java"
-ACCEPTANCE_THRESHOLD = 75
+git clone https://github.com/yourusername/AI_CodeReviewer.git  
+cd AI_CodeReviewer  
 
+### 2. Create Virtual Environment
 
-Ensure the target file exists.
+python -m venv .venv  
 
-7. Start the Server
+Activate:
 
-uvicorn main:app --reload
-Expected output:
-Uvicorn running on http://127.0.0.1:8000
+Windows:
+.venv\Scripts\activate  
 
-8. Access API Interface
+Mac/Linux:
+source .venv/bin/activate  
 
-Open browser:
-http://127.0.0.1:8000/docs
-This launches Swagger UI.
+### 3. Install Dependencies
 
-9. Execute Agent
+pip install -r requirements.txt  
 
-Endpoint:
-POST /agentic-fix-file
-Example request body:
+### 4. Create .env File
+
+Create a `.env` file in root directory:
+
+OPENAI_API_KEY=your_api_key_here  
+
+---
+
+## ▶️ Run Application
+
+uvicorn main:app --reload  
+
+Open:
+
+http://127.0.0.1:8000/docs  
+
+Use Swagger UI to test the API.
+
+---
+
+## 📈 Example API Response
+
 {
-  "instruction": "Convert this code to Python"
+  "status": "success",
+  "score": 82,
+  "retries": 2,
+  "tokens": {
+    "iteration1": 950,
+    "iteration2": 820
+  },
+  "total_tokens": 1770
 }
 
-10. Execution Behavior
+---
 
-Upon request:
-Target file is loaded
-Agent loop begins
-Multiple model calls occur per iteration
-File is overwritten only on acceptance
+
+
