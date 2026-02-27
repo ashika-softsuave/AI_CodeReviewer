@@ -1,0 +1,52 @@
+```python
+class BankAccount:
+    def __init__(self):
+        self._account_holder = ""
+        self._balance = 0.0  # Initialize _balance to a default value
+
+    @property
+    def balance(self):
+        return self._balance
+
+    @balance.setter
+    def balance(self, amount):
+        raise ValueError("Direct balance manipulation is not allowed. Use deposit or withdraw methods.")
+
+    @property
+    def account_holder(self):
+        return self._account_holder
+
+    @account_holder.setter
+    def account_holder(self, name):
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Account holder name must be a non-empty string")
+        self._account_holder = name.strip()
+
+    def deposit(self, amount):
+        if not isinstance(amount, (int, float)):
+            raise ValueError("Deposit amount must be a number")
+        if amount <= 0:
+            raise ValueError("Deposit amount must be positive")
+        self._balance += float(amount)  # Ensure amount is treated as float
+
+    def withdraw(self, amount):
+        if not isinstance(amount, (int, float)):
+            raise ValueError("Withdrawal amount must be a number")
+        if amount <= 0:
+            raise ValueError("Withdrawal amount must be positive")
+        if amount > self._balance:
+            raise ValueError("Insufficient funds")
+        self._balance -= float(amount)  # Ensure amount is treated as float
+
+    def display_balance(self):
+        print(f"Current Balance: {self._balance:.2f}")
+
+
+if __name__ == "__main__":
+    account = BankAccount()
+    account.account_holder = "Ashika"
+    account.deposit(1000)
+    account.deposit(500)
+    account.withdraw(200)
+    account.display_balance()
+```

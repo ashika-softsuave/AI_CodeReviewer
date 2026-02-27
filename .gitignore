@@ -1,0 +1,11 @@
+.env
+*.pyc
+*.py[cod]
+
+venv/
+.venv/
+
+.idea/
+.bak
+.env
+agent_memory.json
