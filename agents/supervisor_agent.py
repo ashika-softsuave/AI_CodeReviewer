@@ -1,63 +1,124 @@
-# agents/supervisor_agent.py
-from typing import Dict, List
+from typing import TypedDict, Optional
+from langgraph.graph import StateGraph, END
 
-class SupervisorAgent:
-    def plan(self, state: Dict) -> Dict:
-        """
-        Decide which agents to execute based on current system state.
-        """
+from agents.review_agent import review_code
+from agents.fix_agent import generate_fix
+from agents.validation_agent import validate_code
+from agents.evalution_agent import evaluate_fix
+from agents.diff_agent import analyze_diff
+from utils.language_utils import detect_language
+from config.ai_config import MAX_RETRIES, ACCEPTANCE_THRESHOLD
 
-        retries = state["retries"]
-        max_retries = state["max_retries"]
-        score = state["score"]
-        threshold = state["threshold"]
-        validation_failed = state["validation_failed"]
-        plateau_count = state["plateau_count"]
-        change_ratio = state["change_ratio"]
+# Shared State Definition
+class AgentState(TypedDict, total=False):
+    code: str
+    instruction: str
+    retries: int
+    score: float
+    plateau_count: int
+    last_score: Optional[float]
+    validation_failed: bool
+    change_ratio: float
+    next: str
+    review: str
 
-        # Stop if max retries reached
-        if retries >= max_retries:
-            return {
-                "action": "stop",
-                "reason": "Maximum retries reached",
-                "agents_to_run": []
-            }
+# Supervisor Node
+def supervisor_node(state: AgentState):
 
-        # Accept if score is sufficient
-        if score >= threshold:
-            return {
-                "action": "accept",
-                "reason": "Score meets threshold",
-                "agents_to_run": []
-            }
+    if state["retries"] >= MAX_RETRIES:
+        state["next"] = "end"
+        return state
 
-        # If validation failed → retry fix only
-        if validation_failed:
-            return {
-                "action": "continue",
-                "reason": "Validation failed, retry fix",
-                "agents_to_run": ["fix", "validate", "evaluate"]
-            }
+    if state["score"] >= ACCEPTANCE_THRESHOLD:
+        state["next"] = "end"
+        return state
 
-        # If excessive rewrite → minimal fix
-        if change_ratio > 80:
-            return {
-                "action": "continue",
-                "reason": "Excessive rewrite detected",
-                "agents_to_run": ["fix", "validate", "evaluate"]
-            }
+    if state["plateau_count"] >= 2:
+        state["next"] = "end"
+        return state
 
-        # If stagnation detected
-        if plateau_count >= 2:
-            return {
-                "action": "stop",
-                "reason": "Improvement stagnation detected",
-                "agents_to_run": []
-            }
+    if state["validation_failed"]:
+        state["next"] = "fix"
+        return state
 
-        # Default: full pipeline
-        return {
-            "action": "continue",
-            "reason": "Score below threshold",
-            "agents_to_run": ["review", "fix", "validate", "evaluate"]
+    state["next"] = "review"
+    return state
+
+# Review Node
+def review_node(state: AgentState):
+    review, _ = review_code(state["code"], state["instruction"], "")
+    state["review"] = review
+    return state
+
+# Fix Node
+def fix_node(state: AgentState):
+    modified_code, _ = generate_fix(
+        state["code"], state["instruction"], state.get("review", "")
+    )
+
+    change_ratio, _ = analyze_diff(state["code"], modified_code)
+
+    state["code"] = modified_code
+    state["change_ratio"] = change_ratio
+    return state
+
+# Validation Node
+def validate_node(state: AgentState):
+    language, _ = detect_language(state["code"])
+    valid, _, _ = validate_code(state["code"], language)
+
+    state["validation_failed"] = not valid
+    return state
+
+# Evaluation Node
+def evaluate_node(state: AgentState):
+    if state["validation_failed"]:
+        return state
+
+    score, _ = evaluate_fix(state["code"], state["instruction"])
+
+    if state["last_score"] is not None:
+        if score - state["last_score"] < 3:
+            state["plateau_count"] += 1
+        else:
+            state["plateau_count"] = 0
+
+    state["last_score"] = score
+    state["score"] = score
+    state["retries"] += 1
+
+    return state
+
+# Build Graph
+def build_graph():
+
+    builder = StateGraph(AgentState)
+
+    # Add Nodes
+    builder.add_node("supervisor", supervisor_node)
+    builder.add_node("review", review_node)
+    builder.add_node("fix", fix_node)
+    builder.add_node("validate", validate_node)
+    builder.add_node("evaluate", evaluate_node)
+
+    # Entry
+    builder.set_entry_point("supervisor")
+
+    # Edges
+    builder.add_edge("review", "fix")
+    builder.add_edge("fix", "validate")
+    builder.add_edge("validate", "evaluate")
+    builder.add_edge("evaluate", "supervisor")
+
+    # Conditional routing from supervisor
+    builder.add_conditional_edges(
+        "supervisor",
+        lambda state: state["next"],
+        {
+            "review": "review",
+            "fix": "fix",
+            "end": END
         }
+    )
+
+    return builder.compile()
